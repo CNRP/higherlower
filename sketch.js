@@ -17,6 +17,9 @@ var firstSelected;
 var numOfCards = 6;
 var totalRevealed = 0;
 
+var debug1 = "";
+var debug2 = "";
+
 function preload(){
   spritedata = loadJSON('json/sprites.json');
   spritesheet = loadImage('assets/Spritesheets/playingCards.png');
@@ -27,43 +30,58 @@ function preload(){
 
 function setup() {
   canvas = createCanvas(window.innerWidth, window.innerHeight);
-
-  for(var i in spritedata){
-      let card = new Card(spritedata[i].name,spritedata[i].x,spritedata[i].y);
-      cards.push(card);
-  }
   let width = cardWidth;
   let height = cardHeight;
-  
+  getAllCards();
+  start();
+}
+
+
+function getAllCards(){
+  cards = [];
+  for(var i in spritedata){
+    //let card = new Card(spritedata[i].name,spritedata[i].x,spritedata[i].y);
+    var card = {
+      name: spritedata[i].name,
+      spritex: spritedata[i].x,
+      spritey: spritedata[i].y,
+      weight : int(spritedata[i].name.substring(1,3)),
+      visible : true,
+      revealed : false,
+      locked : false,
+      set : int(spritedata[i].name.substring(0,1)),
+      img : spritesheet.get(spritedata[i].x, spritedata[i].y, cardWidth, cardHeight),
+    }
+    cards.push(card);
+}
+
+}
+function start(){
   lastSelected.push(cards[0]);
   firstSelected = Math.floor(Math.random() * numOfCards);
 
+  console.log(cards)
 
   for(i=0; i< numOfCards; i++){
     cardsSelected.push(displayRandom());
-    //displayRandom().setAtLocation(startX+(width*i)+i*10,startY);
   }
 
-  cardsSelected[firstSelected].revealCard();
+  revealCard(cardsSelected[firstSelected]);
   clickedCard.push(cardsSelected[firstSelected]);
 }
 
 function draw() {
-  // if(totalRevealed==numOfCards){
-  //   cardsSelected = [];
-  //   clickedCard = [];
-  //   //console.log(cardsSelected)
-  //   for(i=0; i< numOfCards; i++){
-  //     cardsSelected.push(displayRandom());
-  //     //displayRandom().setAtLocation(startX+(width*i)+i*10,startY);
-  //   }
-  //   totalRevealed = 0;
-  //   console.log(cardsSelected)
-  //   console.log(cardsSelected)
-  // }
-
   clear();
   drawBG();
+
+  // if(totalRevealed == numOfCards){
+  //   cardsSelected = [];
+  //   totalRevealed = 0;
+  //   getAllCards();
+  //   start();
+  // }
+  //debug1 = onCard;
+  //debug2 = totalRevealed;
 
   fill(255,255,255);
   textSize(50);       
@@ -76,55 +94,54 @@ function draw() {
   for(i in cardsSelected){
     let width = cardWidth;
     let height = cardHeight;
-    cardsSelected[i].setAtLocation(startX+(width*i)+i*10,startY)
-    //displayRandom().setAtLocation(startX+(width*i)+i*10,startY);
+    setAtLocation(cardsSelected[i],startX+(width*i)+i*10,startY)
   }
 
-  if(!onCard){
-    for(i=0; i< numOfCards; i++){
-      x = cards[i].x + startX +i*10;
-      y =  startY;
-      var over = false;
-      if (mouseX >= this.x &&         // right of the left edge AND
-        mouseX <= this.x + cardWidth &&    // left of the right edge AND
-        mouseY >=  this.y &&         // below the top AND
-        mouseY <=  this.y + cardHeight) {    // above the bottom
-        over = true;
-      }
-    
-      if(over){
-        onCard = true;
-        getCard(mouseX, mouseY).setVisible(false);
-      }
-    }
-  }else if(getCard(mouseX, mouseY) == null){
+  if(onCard && getCard(mouseX, mouseY) == null){
     for(i in cardsSelected){
-      cardsSelected[i].setVisible(true);
+      setVisible(cardsSelected[i],true);
     }
     onCard = false;
+  }else{
+      for(i=0; i< cardsSelected.length; i++){
+      x = cardsSelected[i].locX + startX +i*10;
+      y = startY;
+      if(isOverCard(cardsSelected[i].locX,cardsSelected[i].locY)){
+        onCard = true;
+        setVisible(getCard(mouseX, mouseY));
+      }
+    }
   }
-  
+  //debug();
+}
+
+function debug(){
+  fill(0,0,20);
+  textSize(10);       
+  strokeWeight(3);
+  text('1: '+debug1,20,10);
+  text('2: '+debug2, 20,50);
 }
 
 function drawBG(){
   let c = color(228,228,228);
   background(c);
-  c = color(105,150,180); // Define color 'c'
+  c = color(105,150,180); 
   noStroke(); 
-  fill(c); // Use color variable 'c' as fill color
-  ellipse(1720, 1080, 1805, 1805); // Draw left circle
+  fill(c); 
+  ellipse(1720, 1080, 1805, 1805); 
 
   c = color(241,241,241);
   fill(c);
   ellipse(0, 0, 1800, 1800);
 
-  c = color(255, 204, 0); // Define color 'c'
-  fill(c); // Use color variable 'c' as fill color
-  ellipse(-100, -250, 805, 805); // Draw left circle
+  c = color(255, 204, 0);
+  fill(c); 
+  ellipse(-100, -250, 805, 805); 
 }
 
 function mouseClicked() {
-  if(onCard && getCard(mouseX, mouseY) !=null){
+  if(onCard && getCard(mouseX, mouseY) !=null && !isLocked(getCard(mouseX, mouseY))){
     clickedCard.push(getCard(mouseX, mouseY));
     var l = clickedCard.length;
     if(clickedCard[l-2].weight < clickedCard[l-1].weight && choice == 1){
@@ -133,23 +150,24 @@ function mouseClicked() {
       score += 1;
     }
     if(getCard(mouseX, mouseY) !=null){
-      getCard(mouseX, mouseY).revealCard();
+      revealCard(getCard(mouseX, mouseY));
     }
   }
 }
 
-// window.onresize = function() {
-//   var w = window.innerWidth;
-//   var h = window.innerHeight;  
-//   canvas.size(w,h);
-//   width = w;
-//   height = h;
-  
-// };
-
 function displayRandom(){
   let rand = cards[Math.floor(Math.random() * cards.length)];
   return rand;
+}
+
+function isOverCard(x,y){
+  if (mouseX >= x &&         
+    mouseX <= x + cardWidth &&    
+    mouseY >=  y &&        
+    mouseY <=  y + cardHeight) {    
+    return true;
+  }
+  return false;
 }
 
 function getCard(x,y){
@@ -167,108 +185,81 @@ function getCard(x,y){
   }
 }
 
-function isCard(x,y){
-  for(i in cardsSelected){
-    x1 = cardsSelected[i].locX;
-    y1 = cardsSelected[i].locY;
-    name = cardsSelected[i].name;
-    if (x >= x1 &&         // right of the left edge AND
-      x <= x1 + cardWidth &&    // left of the right edge AND
-      y >=  y1 &&         // below the top AND
-      y <=  y1 + cardHeight) {  
-      //console.log(cardsSelected[i])  
-      return true;
-    }else{
-      return false;
-    }
-  }
+function setAtLocation(card,x,y){
+  card.locX = x;
+  card.locY = y;
+  display(card);
 }
 
-class Card {
-  constructor(name, x, y){
-    this.name = name;
-    this.x = x;
-    this.y = y;
-    this.visible = true;
-    this.revealed = false;
-    this.set = int(this.name.substring(0,1));
-    this.weight = int(this.name.substring(1,3));
+function setVisible(card,bool){
+  card.visible = bool;
+}
 
-    this.img = spritesheet.get(this.x, this.y, cardWidth, cardHeight);
-  }
+function setRevealed(card,bool){
+  card.revealed = bool;
+}
 
-  setAtLocation(x,y){
-    this.locX = x;
-    this.locY = y;
-    this.display();
-  }
+function isVisible(card){
+  return card.visible;
+}
 
-  setVisible(bool){
-    this.visible = bool;
-  }
-  
-  isVisible(){
-    return this.visible;
-  }
+function setLocked(card,bool){
+  card.locked = bool;
+}
 
-  setLocked(bool){
-    this.locked = bool;
-  }
-  
-  isLocked(){
-    return this.locked;
-  }
+function isLocked(card){
+  return card.locked;
+}
 
-  display(){
-    if(this.isVisible()&& !this.isLocked()&&!this.revealed){
-      image(cardback, this.locX,this.locY)
-    }else{
-      image(this.img,this.locX,this.locY)
-      if(!this.revealed){
-        image(cardHigherLower, this.locX,this.locY)
+function display(card){
+  if(isVisible(card)&& !isLocked(card)&&!card.revealed){
+    image(cardback, card.locX,card.locY)
+  }else{
+    image(card.img,card.locX,card.locY)
+    if(!card.revealed){
+      image(cardHigherLower, card.locX,card.locY)
 
-        strokeWeight(1);
-        if (mouseX >= this.locX &&         // right of the left edge AND
-          mouseX <= this.locX + cardWidth &&    // left of the right edge AND
-          mouseY >=  this.locY &&         // below the top AND
-          mouseY <=  this.locY + cardHeight/2) {    // above the bottom
-          stroke('rgba(0,255,0,1)');
-          choice = 1;
-        }else{
-          stroke('rgba(0,255,0,0.15)');
-        }
-
-        let c = color(241,241,241);
-        // stroke('rgba(0,255,0,0.25)');
-        noFill();
-        rect(this.locX,this.locY,cardWidth,cardHeight/2,5)
-
-        if (mouseX >= this.locX &&         // right of the left edge AND
-          mouseX <= this.locX + cardWidth &&    // left of the right edge AND
-          mouseY >=  this.locY+(cardHeight/2) &&         // below the top AND
-          mouseY <=  this.locY + cardHeight) {    // above the bottom
-          stroke('rgba(255,0,0,1)');
-          choice = 2;
-        }else{
-          stroke('rgba(255,0,0,0.15)');
-        }
-        c = color(241,241,241);
-        // stroke('rgba(255,0,0,0.25)');
-        rect(this.locX,this.locY+(cardHeight/2),cardWidth,cardHeight/2,5)
-
+      strokeWeight(1);
+      if (mouseX >= card.locX &&         // right of the left edge AND
+        mouseX <= card.locX + cardWidth &&    // left of the right edge AND
+        mouseY >=  card.locY &&         // below the top AND
+        mouseY <=  card.locY + cardHeight/2) {    // above the bottom
+        stroke('rgba(0,255,0,1)');
+        choice = 1;
       }else{
-        this.setLocked(true);
+        stroke('rgba(0,255,0,0.15)');
       }
+
+      let c = color(241,241,241);
+      // stroke('rgba(0,255,0,0.25)');
+      noFill();
+      rect(card.locX,card.locY,cardWidth,cardHeight/2,5)
+
+      if (mouseX >= card.locX &&         // right of the left edge AND
+        mouseX <= card.locX + cardWidth &&    // left of the right edge AND
+        mouseY >=  card.locY+(cardHeight/2) &&         // below the top AND
+        mouseY <=  card.locY + cardHeight) {    // above the bottom
+        stroke('rgba(255,0,0,1)');
+        choice = 2;
+      }else{
+        stroke('rgba(255,0,0,0.15)');
+      }
+      c = color(241,241,241);
+      // stroke('rgba(255,0,0,0.25)');
+      rect(card.locX,card.locY+(cardHeight/2),cardWidth,cardHeight/2,5)
+
+    }else{
+      setLocked(card,true);
     }
-  
   }
 
-  revealCard(){
-    this.revealed = true;
-    totalRevealed += 1;
-  }
+}
 
-  getImage(){
-    return this.img;
-  }
+function revealCard(card){
+  card.revealed = true;
+  totalRevealed += 1;
+}
+
+function getImage(card){
+  return card.img;
 }
