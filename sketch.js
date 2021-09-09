@@ -1,24 +1,23 @@
-let spritesheet;
-let spritedata;
-let cards = [];
-let cardsSelected = [];
-let clickedCard = [];
-var canvas;
-var lastSelected = [];
-let choice = 0;
-var startX = 500;
-var startY = 300;
-var rects = [];
-var onCard = false;
-var score = 0;
-var cardHeight = 190;
+let spritesheet; // references the spritesheet image
+let spritedata; // references the spritesheet json file which relates coordinates and values to spritesheet
+
+var canvas; // p5 canvas 
+var startX = 500; // offset for cards to be drawn at
+var startY = 350;
+var cardHeight = 190; // fixed card dimension variables
 var cardWidth = 140;
-var firstSelected;
-var numOfCards = 6;
-var totalRevealed = 0;
+var numOfCards = 6; // how many cards on screen to be selected from
+
+let choice = 0; // changed depending on what half of the card is clicked, top half for higher(0) bottom half for lower(1).
+var onCard = false; // is the mouse ontop of a pickable card
+
+var score = 0; // score of correct answers
+var totalRevealed = 0; // how many have been selected in total
 
 var debug1 = "";
 var debug2 = "";
+
+var cards;
 
 function preload(){
   spritedata = loadJSON('json/sprites.json');
@@ -32,56 +31,50 @@ function setup() {
   canvas = createCanvas(window.innerWidth, window.innerHeight);
   let width = cardWidth;
   let height = cardHeight;
-  getAllCards();
+  
   start();
 }
 
-
-function getAllCards(){
-  cards = [];
-  for(var i in spritedata){
-    //let card = new Card(spritedata[i].name,spritedata[i].x,spritedata[i].y);
-    var card = {
-      name: spritedata[i].name,
-      spritex: spritedata[i].x,
-      spritey: spritedata[i].y,
-      weight : int(spritedata[i].name.substring(1,3)),
-      visible : true,
-      revealed : false,
-      locked : false,
-      set : int(spritedata[i].name.substring(0,1)),
-      img : spritesheet.get(spritedata[i].x, spritedata[i].y, cardWidth, cardHeight),
-    }
-    cards.push(card);
-}
-
-}
 function start(){
-  lastSelected.push(cards[0]);
-  firstSelected = Math.floor(Math.random() * numOfCards);
-
-  console.log(cards)
+  getCardsFromSprite();
 
   for(i=0; i< numOfCards; i++){
-    cardsSelected.push(displayRandom());
+    cards.insertPickableCard();
   }
 
-  revealCard(cardsSelected[firstSelected]);
-  clickedCard.push(cardsSelected[firstSelected]);
+  for(let i = 0; i < cards.cardSelection.length; i++){
+    var card = cards.cardSelection[i];
+    card.locX = startX+(cardWidth*i)+i*10;
+    card.locY = startY; 
+  }
+  print(cards.cardSelection)
+
+  //var firstCard = cards.cardSelection[Math.floor(Math.random() * cards.cardSelection.length)];
+  var firstCard = cards.cardSelection[0];
+  cards.pickCard(firstCard);
+
 }
+
+function getCardsFromSprite(){  
+  cards = new Cards();
+  for(var i in spritedata){
+    var card = new Card(spritedata[i].name, spritedata[i].x, spritedata[i].y, int(spritedata[i].name.substring(1,3)), spritesheet.get(spritedata[i].x, spritedata[i].y, cardWidth, cardHeight));
+    cards.addCard(card);
+  }
+}
+
 
 function draw() {
   clear();
   drawBG();
 
-  // if(totalRevealed == numOfCards){
-  //   cardsSelected = [];
-  //   totalRevealed = 0;
-  //   getAllCards();
-  //   start();
-  // }
-  //debug1 = onCard;
-  //debug2 = totalRevealed;
+  if(totalRevealed == numOfCards){
+    cards.allCards = [];
+    cards.cardSelection = [];
+    cards.clickedCards = [];
+    totalRevealed = 0;
+    start();
+  }
 
   fill(255,255,255);
   textSize(50);       
@@ -91,37 +84,70 @@ function draw() {
   text('Score: '+score, startX, startY-30);
   text('Lives: '+score, startX, startY+cardHeight+60);
 
-  for(i in cardsSelected){
-    let width = cardWidth;
-    let height = cardHeight;
-    setAtLocation(cardsSelected[i],startX+(width*i)+i*10,startY)
+  for(let i = 0; i < cards.cardSelection.length; i++){
+    var card = cards.cardSelection[i];
+    card.display();
   }
 
-  if(onCard && getCard(mouseX, mouseY) == null){
-    for(i in cardsSelected){
-      setVisible(cardsSelected[i],true);
-    }
-    onCard = false;
-  }else{
-      for(i=0; i< cardsSelected.length; i++){
-      x = cardsSelected[i].locX + startX +i*10;
-      y = startY;
-      if(isOverCard(cardsSelected[i].locX,cardsSelected[i].locY)){
-        onCard = true;
-        setVisible(getCard(mouseX, mouseY));
+  cards.scanHover();
+}
+
+
+function mouseClicked() {
+  if(onCard){
+    if(getCard(mouseX, mouseY) !=null){
+      var card = getCard(mouseX, mouseY);
+      if(!card.locked){
+        
+        let a = cards.clickedCards;
+        a.push(card);
+
+        var l = a.length;
+        if(a[l-2].weight < a[l-1].weight && choice == 1){
+          score += 1;
+        }else if(a[l-2].weight > a[l-1].weight && choice == 2){
+          score += 1;
+        }
+        cards.pickCard(card);
       }
     }
   }
-  //debug();
 }
 
-function debug(){
-  fill(0,0,20);
-  textSize(10);       
-  strokeWeight(3);
-  text('1: '+debug1,20,10);
-  text('2: '+debug2, 20,50);
+function getCard(x,y){
+  for(i in cards.cardSelection){
+    x1 = cards.cardSelection[i].locX;
+    y1 = cards.cardSelection[i].locY;
+    if (x >= x1 &&         // right of the left edge AND
+      x <= x1 + cardWidth &&    // left of the right edge AND
+      y >=  y1 &&         // below the top AND
+      y <=  y1 + cardHeight) {  
+      return cards.cardSelection[i];
+    }
+  }
 }
+
+function isOverCard(x,y){
+  if (mouseX >= x &&         
+    mouseX <= x + cardWidth &&    
+    mouseY >=  y &&        
+    mouseY <=  y + cardHeight) {    
+    return true;
+  }
+  return false;
+}
+
+
+//debug1 = onCard;
+//debug2 = totalRevealed;
+
+// function debug(){
+//   fill(0,0,20);
+//   textSize(10);       
+//   strokeWeight(3);
+//   text('1: '+debug1,20,10);
+//   text('2: '+debug2, 20,50);
+// }
 
 function drawBG(){
   let c = color(228,228,228);
@@ -140,90 +166,81 @@ function drawBG(){
   ellipse(-100, -250, 805, 805); 
 }
 
-function mouseClicked() {
-  if(onCard && getCard(mouseX, mouseY) !=null && !isLocked(getCard(mouseX, mouseY))){
-    clickedCard.push(getCard(mouseX, mouseY));
-    var l = clickedCard.length;
-    if(clickedCard[l-2].weight < clickedCard[l-1].weight && choice == 1){
-      score += 1;
-    }else if(clickedCard[l-2].weight > clickedCard[l-1].weight && choice == 2){
-      score += 1;
-    }
-    if(getCard(mouseX, mouseY) !=null){
-      revealCard(getCard(mouseX, mouseY));
+class Cards {
+  allCards = [];
+  cardSelection = [];
+  clickedCards = [];
+  lastSelected; 
+
+  constructor(){
+    
+  }
+
+  addCard(card){
+    this.allCards.push(card)
+  }
+
+  insertPickableCard(){
+    let rand = Math.floor(Math.random() * this.allCards.length);
+    let card = this.allCards[rand];
+    this.cardSelection.push(card);
+    this.allCards.splice(rand, 1);
+    //print(this.allCards.length+ " : "+this.cardSelection.length)
+  }
+
+  pickCard(card){
+    this.clickedCards.push(card);
+    this.lastSelected = this.clickedCards[this.clickedCards.length-1];
+    card.revealCard();
+    print("Card Clicked: "+this.lastSelected.name)
+  }
+
+  scanHover(){
+    if(onCard && getCard(mouseX, mouseY) == null){
+
+      for(let i = 0; i < this.allCards.length; i++){
+        var card = this.allCards[i];
+        //card.visible = true;
+      }
+      onCard = false;
+
+    }else{
+
+      for(let i = 0; i < this.cardSelection.length; i++){
+        var card = this.cardSelection[i];
+        if(isOverCard(card.locX,card.locY)){
+          onCard = true;
+          //card.visible = true;
+        }
+      }
     }
   }
 }
 
-function displayRandom(){
-  let rand = cards[Math.floor(Math.random() * cards.length)];
-  return rand;
-}
+class Card {
+  constructor(name, spriteX, spriteY, weight, img){
+    this.name = name;
+    this.spriteX = spriteX;
+    this.spriteY = spriteY; 
+    this.weight = weight;
+    this.img = img;
 
-function isOverCard(x,y){
-  if (mouseX >= x &&         
-    mouseX <= x + cardWidth &&    
-    mouseY >=  y &&        
-    mouseY <=  y + cardHeight) {    
-    return true;
+    this.selected = false;
+    this.revealed = false;
+    this.locked = false;
   }
-  return false;
-}
 
-function getCard(x,y){
-  for(i in cardsSelected){
-    x1 = cardsSelected[i].locX;
-    y1 = cardsSelected[i].locY;
-    name = cardsSelected[i].name;
-    if (x >= x1 &&         // right of the left edge AND
-      x <= x1 + cardWidth &&    // left of the right edge AND
-      y >=  y1 &&         // below the top AND
-      y <=  y1 + cardHeight) {  
-      //console.log(cardsSelected[i])  
-      return cardsSelected[i];
-    }
-  }
-}
+  display(){
+    image(this.img, this.locX, this.locY)
 
-function setAtLocation(card,x,y){
-  card.locX = x;
-  card.locY = y;
-  display(card);
-}
-
-function setVisible(card,bool){
-  card.visible = bool;
-}
-
-function setRevealed(card,bool){
-  card.revealed = bool;
-}
-
-function isVisible(card){
-  return card.visible;
-}
-
-function setLocked(card,bool){
-  card.locked = bool;
-}
-
-function isLocked(card){
-  return card.locked;
-}
-
-function display(card){
-  if(isVisible(card)&& !isLocked(card)&&!card.revealed){
-    image(cardback, card.locX,card.locY)
-  }else{
-    image(card.img,card.locX,card.locY)
-    if(!card.revealed){
-      image(cardHigherLower, card.locX,card.locY)
+    if(!this.revealed){
+      image(cardHigherLower, this.locX,this.locY)
 
       strokeWeight(1);
-      if (mouseX >= card.locX &&         // right of the left edge AND
-        mouseX <= card.locX + cardWidth &&    // left of the right edge AND
-        mouseY >=  card.locY &&         // below the top AND
-        mouseY <=  card.locY + cardHeight/2) {    // above the bottom
+      if (mouseX >= this.locX &&         // right of the left edge AND
+        mouseX <= this.locX + cardWidth &&    // left of the right edge AND
+        mouseY >=  this.locY &&         // below the top AND
+        mouseY <=  this.locY  + cardHeight/2) {    // above the bottom
         stroke('rgba(0,255,0,1)');
         choice = 1;
       }else{
@@ -233,12 +250,12 @@ function display(card){
       let c = color(241,241,241);
       // stroke('rgba(0,255,0,0.25)');
       noFill();
-      rect(card.locX,card.locY,cardWidth,cardHeight/2,5)
+      rect(this.locX, this.locY, cardWidth, cardHeight/2,5)
 
-      if (mouseX >= card.locX &&         // right of the left edge AND
-        mouseX <= card.locX + cardWidth &&    // left of the right edge AND
-        mouseY >=  card.locY+(cardHeight/2) &&         // below the top AND
-        mouseY <=  card.locY + cardHeight) {    // above the bottom
+      if (mouseX >= this.locX &&         // right of the left edge AND
+        mouseX <= this.locX + cardWidth &&    // left of the right edge AND
+        mouseY >=  this.locY +(cardHeight/2) &&         // below the top AND
+        mouseY <=  this.locY + cardHeight) {    // above the bottom
         stroke('rgba(255,0,0,1)');
         choice = 2;
       }else{
@@ -246,20 +263,17 @@ function display(card){
       }
       c = color(241,241,241);
       // stroke('rgba(255,0,0,0.25)');
-      rect(card.locX,card.locY+(cardHeight/2),cardWidth,cardHeight/2,5)
+      rect(this.locX,this.locY+(cardHeight/2),cardWidth,cardHeight/2,5)
 
     }else{
-      setLocked(card,true);
+      this.revealed = true;
     }
+    
   }
-
-}
-
-function revealCard(card){
-  card.revealed = true;
-  totalRevealed += 1;
-}
-
-function getImage(card){
-  return card.img;
+  
+  revealCard(){
+    this.revealed = true;
+    totalRevealed += 1;
+  }
+  
 }
