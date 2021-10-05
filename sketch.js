@@ -27,12 +27,18 @@ function preload(){
   //cardHigherLower = loadImage('assets/PNG/Cards/cardHigherLower.png');
 }
 
+var scoreA; 
+
 function setup() {
   canvas = createCanvas(window.innerWidth, window.innerHeight);
   let width = cardWidth;
   let height = cardHeight;
   
+  startX = window.innerWidth - cardWidth*10
+
   start();
+
+  scoreA = new anim();
 }
 
 function start(){
@@ -81,8 +87,32 @@ function draw() {
   strokeWeight(3);
   textFont("Rockwell Nova")
   stroke('rgba(187,187,187,1)');
-  text('Score: '+score, startX, startY-30);
-  text('Lives: '+score, startX, startY+cardHeight+60);
+  textAlign(CENTER, CENTER);
+  text('Score: '+score, width/2, startY-40);
+  text('Lives: '+score, width/2, startY+cardHeight+50);
+
+
+  if(scoreA.running()){
+    if(scoreA.tick <= 60){
+      scoreA.tick+=2;
+    }else{
+      scoreA.tick= -100;
+      scoreA.stop();
+    }
+  }
+
+  if(!cards.score){
+    fill(255,0,0);
+    stroke('rgba(200,0,0,1)');
+    textAlign(CENTER, CENTER);
+    text("-1", window.innerWidth/2, scoreA.tick)
+  }
+  if(cards.score){
+    fill(0,255,0);
+    stroke('rgba(0,200,0,1)');
+    textAlign(CENTER, CENTER);
+    text("+1", window.innerWidth/2, scoreA.tick)
+  }
 
   for(let i = 0; i < cards.cardSelection.length; i++){
     var card = cards.cardSelection[i];
@@ -105,8 +135,16 @@ function mouseClicked() {
         var l = a.length;
         if(a[l-2].weight < a[l-1].weight && choice == 1){
           score += 1;
+          cards.score = true;
+          scoreA.start();
         }else if(a[l-2].weight > a[l-1].weight && choice == 2){
           score += 1;
+          cards.score = true;
+          scoreA.start();
+        }else{
+          score -= 1;
+          cards.score = false;
+          scoreA.start();
         }
         cards.pickCard(card);
       }
@@ -152,8 +190,19 @@ function isOverCard(x,y){
 function drawBG(){
   let c = color(228,228,228);
   background(c);
-  c = color(105,150,180); 
+  
+  
   noStroke(); 
+  if(scoreA.running()){
+    if(cards.score){
+      c = color(0, 204, 0);
+    }else{
+      c = color(204, 0, 0);
+    }
+  }else{
+    c = color(105,150,180); 
+  }
+  
   fill(c); 
   ellipse(1720, 1080, 1805, 1805); 
 
@@ -161,7 +210,16 @@ function drawBG(){
   fill(c);
   ellipse(0, 0, 1800, 1800);
 
-  c = color(255, 204, 0);
+  if(scoreA.running()){
+    if(cards.score){
+      c = color(0, 204, 0);
+    }else{
+      c = color(204, 0, 0);
+    }
+  }else{
+    c = color(255, 204, 0);
+  }
+  
   fill(c); 
   ellipse(-100, -250, 805, 805); 
 }
@@ -171,6 +229,9 @@ class Cards {
   cardSelection = [];
   clickedCards = [];
   lastSelected; 
+
+  score = false;
+  scoreChange = false;
 
   constructor(){
     
@@ -276,4 +337,25 @@ class Card {
     totalRevealed += 1;
   }
   
+}
+
+class anim{
+  animActive = false;
+  tick = -20;
+
+  constructor(){
+
+  }
+
+  start(){
+    this.animActive = true;
+  }
+
+  stop(){
+    this.animActive = false;
+  }
+
+  running(){
+    return this.animActive;
+  }
 }
