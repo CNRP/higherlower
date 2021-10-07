@@ -36,35 +36,51 @@ function setup() {
   
   startX = window.innerWidth - cardWidth*10
 
+  cards = new Cards();
+  getCardsFromSprite();
   start();
 
   scoreA = new anim();
+  jokerA = new anim();
+
+  jokerA.start();
+  jokerA.tick= window.height+50;
 }
 
 function start(){
-  getCardsFromSprite();
+
+  // cards.allCards.forEach(function(item, index, object) {
+  //   if (cards.isClicked(item.name)) {
+  //     object.splice(index, 1);
+  //   }
+  // });
 
   for(i=0; i< numOfCards; i++){
     cards.insertPickableCard();
   }
+  
+  //print(cards.cardSelection)
+  //print(cards.allCards.length)
+
+
+
+  //var firstCard = cards.cardSelection[Math.floor(Math.random() * cards.cardSelection.length)];
+  var firstCard = cards.cardSelection[0];
+  firstCard.pickCard();
+  //print(cards.getClicked())
+
 
   for(let i = 0; i < cards.cardSelection.length; i++){
     var card = cards.cardSelection[i];
     card.locX = startX+(cardWidth*i)+i*10;
     card.locY = startY; 
   }
-  print(cards.cardSelection)
-
-  //var firstCard = cards.cardSelection[Math.floor(Math.random() * cards.cardSelection.length)];
-  var firstCard = cards.cardSelection[0];
-  cards.pickCard(firstCard);
 
 }
 
 function getCardsFromSprite(){  
-  cards = new Cards();
   for(var i in spritedata){
-    var card = new Card(spritedata[i].name, spritedata[i].x, spritedata[i].y, int(spritedata[i].name.substring(1,3)), spritesheet.get(spritedata[i].x, spritedata[i].y, cardWidth, cardHeight));
+    var card = new Card(spritedata[i].name, spritedata[i].x, spritedata[i].y, int(spritedata[i].name.substring(1,3)),spritedata[i].name.charAt(0),spritesheet.get(spritedata[i].x, spritedata[i].y, cardWidth, cardHeight));
     cards.addCard(card);
   }
 }
@@ -74,10 +90,17 @@ function draw() {
   clear();
   drawBG();
 
+  for(let i = 0; i < cards.getClicked().length; i++){
+    var card = cards.getClicked()[i];
+
+    yOffset = card.offset-1;
+    card.displayMini(50, (cardHeight)*yOffset + 50+(yOffset*50));
+  }
+
   if(totalRevealed == numOfCards){
-    cards.allCards = [];
+    // cards.allCards = [];
     cards.cardSelection = [];
-    cards.clickedCards = [];
+    //cards.clickedCards = [];
     totalRevealed = 0;
     start();
   }
@@ -96,10 +119,20 @@ function draw() {
     if(scoreA.tick <= 60){
       scoreA.tick+=2;
     }else{
-      scoreA.tick= -100;
+      scoreA.tick = -100;
       scoreA.stop();
     }
   }
+
+  // if(jokerA.running()){
+  //   if(jokerA.tick >= window.height - 50){
+  //     print(jokerA);
+  //     jokerA -= 2;
+  //   }else{
+  //     jokerA.tick = window.height - 50;
+  //     //jokerA.stop();
+  //   }
+  // }
 
   if(!cards.score){
     fill(255,0,0);
@@ -112,6 +145,13 @@ function draw() {
     stroke('rgba(0,200,0,1)');
     textAlign(CENTER, CENTER);
     text("+1", window.innerWidth/2, scoreA.tick)
+  }
+
+  if(cards.joker){
+    fill(255,255,0);
+    stroke('rgba(200,200,0,1)');
+    textAlign(CENTER, CENTER);
+    text("JOKER", window.innerWidth/2, jokerA.tick)
   }
 
   for(let i = 0; i < cards.cardSelection.length; i++){
@@ -128,25 +168,29 @@ function mouseClicked() {
     if(getCard(mouseX, mouseY) !=null){
       var card = getCard(mouseX, mouseY);
       if(!card.locked){
-        
-        let a = cards.clickedCards;
-        a.push(card);
-
-        var l = a.length;
-        if(a[l-2].weight < a[l-1].weight && choice == 1){
-          score += 1;
-          cards.score = true;
-          scoreA.start();
-        }else if(a[l-2].weight > a[l-1].weight && choice == 2){
-          score += 1;
-          cards.score = true;
-          scoreA.start();
+        card.pickCard();
+        if(card.weight == 0){
+          //print("jokerrr");
         }else{
-          score -= 1;
-          cards.score = false;
-          scoreA.start();
+          var l = cards.getClicked().length;
+          var lastcard = cards.getClicked()[cards.getClicked().length-2]
+
+
+          print(lastcard.weight+" : "+card.weight)
+          if(lastcard.weight < card.weight && choice == 1){
+            score += 1;
+            cards.score = true;
+            scoreA.start();
+          }else if(lastcard.weight > card.weight && choice == 2){
+            score += 1;
+            cards.score = true;
+            scoreA.start();
+          }else{
+            score -= 1;
+            cards.score = false;
+            scoreA.start();
+          }
         }
-        cards.pickCard(card);
       }
     }
   }
@@ -227,11 +271,17 @@ function drawBG(){
 class Cards {
   allCards = [];
   cardSelection = [];
-  clickedCards = [];
   lastSelected; 
+  allClicked = [];
 
   score = false;
+  joker = true;
   scoreChange = false;
+
+  hTotal = 0;
+  cTotal = 0;
+  sTotal = 0;
+  dTotal = 0;
 
   constructor(){
     
@@ -244,17 +294,35 @@ class Cards {
   insertPickableCard(){
     let rand = Math.floor(Math.random() * this.allCards.length);
     let card = this.allCards[rand];
-    this.cardSelection.push(card);
-    this.allCards.splice(rand, 1);
-    //print(this.allCards.length+ " : "+this.cardSelection.length)
+    if(card.click == true || card.selected == true){    
+      cards.insertPickableCard();
+    }else{
+      card.selected = true;
+      this.cardSelection.push(card);
+    }
   }
 
-  pickCard(card){
-    this.clickedCards.push(card);
-    this.lastSelected = this.clickedCards[this.clickedCards.length-1];
-    card.revealCard();
-    print("Card Clicked: "+this.lastSelected.name)
+
+  getClicked(){
+    return this.allClicked;
   }
+
+  getAvailible(){
+    return this.allAvalible;
+  }
+
+  // isClicked(name){
+  //   //print(this.clickedCards.length)
+  //   // // print(name+" ")
+  //   this.clickedCards.forEach((entry) => {
+  //     if(!entry.name == name){
+  //       return false;
+  //     }else{
+  //       return true;
+  //     }
+  //   });
+  // }
+
 
   scanHover(){
     if(onCard && getCard(mouseX, mouseY) == null){
@@ -279,7 +347,7 @@ class Cards {
 }
 
 class Card {
-  constructor(name, spriteX, spriteY, weight, img){
+  constructor(name, spriteX, spriteY, weight, suit, img){
     this.name = name;
     this.spriteX = spriteX;
     this.spriteY = spriteY; 
@@ -289,9 +357,17 @@ class Card {
     this.selected = false;
     this.revealed = false;
     this.locked = false;
+    this.click = false;
+
+    this.locX = 0; 
+    this.locY = 0;
+
+    this.suit = suit;
+    this.offset = 20;
   }
 
   display(){
+    
     image(this.img, this.locX, this.locY)
 
     if(!this.revealed){
@@ -331,20 +407,71 @@ class Card {
     }
     
   }
+
+  displayMini(x, y){
+    scale(0.25);
+
+    var yOffset;
+    switch(this.suit) {
+      case "C":
+        yOffset = 0;
+        break;
+      case "S":
+        yOffset = 1;
+        break;
+      case "H":
+        yOffset = 2;
+        break;
+      case "D":
+        yOffset = 3;
+        break;
+      default: 
+        yOffset = 10;
+    }
+    image(this.img, x + (yOffset*cardWidth), y);
+    scale(4);
+  }
   
   revealCard(){
     this.revealed = true;
     totalRevealed += 1;
   }
   
+  pickCard(){
+    this.click = true;
+    cards.allClicked.push(this);
+    cards.lastSelected = cards.getClicked()[cards.getClicked().length-1];
+    this.revealCard();
+
+    switch(this.suit) {
+      case "C":
+        cards.cTotal += 1;
+        this.offset = cards.cTotal;
+        break;
+      case "S":
+        cards.sTotal += 1;
+        this.offset = cards.sTotal;
+        break;
+      case "H":
+        cards.hTotal += 1;
+        this.offset = cards.hTotal;
+        break;
+      case "D":
+        cards.dTotal += 1;
+        this.offset = cards.dTotal;
+        break;
+      default: 
+        yOffset = 10;
+    }
+  }
+
 }
 
 class anim{
-  animActive = false;
-  tick = -20;
 
   constructor(){
-
+    this.animActive = false;
+    this.tick = -20;
   }
 
   start(){
